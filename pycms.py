@@ -1,4 +1,5 @@
 """
+Package dealing with ROOT or/and CMSSW in a compact and uniform way
 """
 
 def printError( name, message, _exception ):
@@ -17,8 +18,7 @@ def printError( name, message, _exception ):
 	mess = ''
 	for l in _lines:
 		mess += '\033[1;31m'+name+' Error: '+l+'\n\033[1;m'
-	print mess
-	raise _exception
+	raise _exception(mess)
 
 def printWarning( name, message ):
 	""".. function:: printWarning(name, message) 
@@ -33,19 +33,33 @@ def printWarning( name, message ):
 	_lines = message.split('\n')
 	mess = ''
 	for l in _lines:
-		mess = '\033[1;33m'+name+' Warning: '+message+'\033[1;m\n'
+		mess = '\033[1;33m'+name+' WARNING\033[1;m: '+message+'\n'
+	mess = mess[:-1]
+	print mess
+
+def printInfo( name, message ):
+	""".. function:: printInfo(name, message) 
+
+	Print a informational message (in blue color) and continue
+
+	:param name: module which call
+	:type name: string
+	:param message: message to print
+	:type message: string
+	"""
+	_lines = message.split('\n')
+	mess = ''
+	for l in _lines:
+		mess = '\033[1;34m'+name+' INFO\033[1;m: '+message+'\n'
 	mess = mess[:-1]
 	print mess
 
 
 class pycms( object ):
-	"""
+	""".. class: :pycms(rootfilename[,trees=[name1,..],edm=True,verbose=True])
+
 	Wrapper to access a root file.
 	"""
-	#self.isEDM = False
-	# Si situas inicializaciones, estas solo 
-	# se efectuaran al hacer el import (i.e solo una vez)
-
 	def __init__( self, namerootfile, **keywords ):
 		"""
 		"""
@@ -54,16 +68,26 @@ class pycms( object ):
 		self.totalTrees = 0
 		self.treenames = []
 
-		validkeywords = [ 'trees' ]
+		validkeywords = [ 'trees', 'edm', 'verbose' ]
 		userTrees = False
-				
+		
+		# Check if is EDM and initialize workspace 
+		if keywords.has_key('edm'):
+			self.__initworkspace__()
+		
+		# Check verbosity
+		verbose = False
+		if keywords.has_key('verbose'):
+			verbose=True
+
+		
+		# Initialize file (before decide the trees to be used)				
+		if verbose:
+			printInfo('pycms','Initializing root file "%s"' % namerootfile)
 		self.__filename__ = namerootfile
 		self.__rootfile__ = TFile.Open( self.__filename__ )
 		if self.__rootfile__.IsZombie():
 			printError( self.__module__+'.pycms', 'Something wrong. I cannot open the rootfile', IOError )
-
-		#FIXME: Check if is EDM and initialize workspace
-		# __initworkspace()
 
 		for key, value in keywords.iteritems():
 			if not key in validkeywords:
@@ -95,12 +119,27 @@ class pycms( object ):
 				if tree.GetClassName() == 'TTree':
 					self.__registryTree__( tree.GetName() )
 
-	def __initworkspace__():
+		# More info if the user asked for
+		if verbose:
+			mess = '+ Number of initialized trees:%i\n' % self.totalTrees
+			for treename in self.treenames:
+					mess += '            |- %s\n' % treename 
+			printInfo('pycms',mess[:-1])
+
+	def __initworkspace__(self):
 		"""
 		"""
 		import ROOT
-		if ROOT.gSystem.Load('libFWCoreFWLite.so') == 0:
+		printInfo('pycms','Initializing CMSSW Lite libraries')
+		loadout = ROOT.gSystem.Load('libFWCoreFWLite.so') 
+		if loadout == 0:
 			ROOT.AutoLibraryLoader.enable()
+			#ROOT.gSystem.Load("libDataFormats.so")
+		elif loadout == 1:
+			printInfo('pycms',"CMSSW Lite libraries already loaded")
+		else:
+			printWarning('pycms',"CMSSW environment variables not set."\
+					" Have you forgotten 'cmsenv' or 'eval `scram runtime -sh`?")
 
 	def __registryTree__( self, treeName ):
 		"""
@@ -120,8 +159,9 @@ class pycms( object ):
 		self.treenames.append( treeName )
 
 	def getproduct( self, label, tree='' ):
+		""".. method:: getproduct(label[,tree]) -> 
 		"""
-		"""
+		# XXX TO BE DEPRECATED?? The product belongs to the tree, not to this file-wrapper class
 		if tree == '' and self.totalTrees != 1:
 			message = "I have more than one TTree. I explicity need the name of the tree"
 			message += "\nCall the function 'get( label, treename )'"
@@ -141,7 +181,8 @@ class pycms( object ):
 
 
 class pytree(object):
-	"""Class to deal with the TTree content of a root file. 
+	""".. class:: pytree(treeobject[,])
+	Class to deal with the TTree content of a root file. 
 	It acts as a wrapper, so the correct initialization 
 	of the TTree does not fall on that class.
 	"""
@@ -251,7 +292,7 @@ class pytree(object):
 	def getproduct( self, label ):
 		""".. method:: getproduct( label ) -> object
 		"""
-		PLAIN_TYPES = [ 'Int_t', 'Float_t' ]
+		PLAIN_TYPES = [ 'Bool_t', 'Int_t', 'Float_t' ]
 
 		thelabel = label
 
@@ -390,6 +431,10 @@ class pywrapper( object ):
 		"""
 		# I need the module in the eval
 		import ROOT
+		#--- FIXME: Provisional patch to deal with double and int stuff
+		ROOT.double = ROOT.Double
+		ROOT.int    = int
+		#--- END Provisional
 
 		self.label = label
 		self.__pytree__ = _pytree_  # Do not use it. FIXME: HAcer funcion que evite el acceso al pytree
