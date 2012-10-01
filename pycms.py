@@ -17,7 +17,7 @@ def printError( name, message, _exception ):
 	_lines = message.split('\n')
 	mess = ''
 	for l in _lines:
-		mess += '\033[1;31m'+name+' Error: '+l+'\n\033[1;m'
+		mess += '\033[1;31m'+name+' Error\033[1;m: '+l+'\n'
 	raise _exception(mess)
 
 def printWarning( name, message ):
@@ -72,12 +72,12 @@ class pycms( object ):
 		userTrees = False
 		
 		# Check if is EDM and initialize workspace 
-		if keywords.has_key('edm'):
-			self.__initworkspace__()
+		if keywords.has_key('edm') and keywords['edm']:
+				self.__initworkspace__()
 		
 		# Check verbosity
 		verbose = False
-		if keywords.has_key('verbose'):
+		if keywords.has_key('verbose') and keywords['verbose']:
 			verbose=True
 
 		
@@ -86,7 +86,10 @@ class pycms( object ):
 			printInfo('pycms','Initializing root file "%s"' % namerootfile)
 		self.__filename__ = namerootfile
 		self.__rootfile__ = TFile.Open( self.__filename__ )
-		if self.__rootfile__.IsZombie():
+		try:
+			# Method TFile::Open returns a null pointer 
+			dummy = self.__rootfile__.IsZombie()
+		except ReferenceError:
 			printError( self.__module__+'.pycms', 'Something wrong. I cannot open the rootfile', IOError )
 
 		for key, value in keywords.iteritems():
@@ -202,15 +205,16 @@ class pytree(object):
 		#	printError( self.__module__+'.pycms', message, RuntimeError )
 
 		# Dictionary of collection name: python object
-		#self.collections = dict( [ (i.GetName(), pythonize(i.GetClassName()) ) for i in self.tree.GetListOfBranches() ] ) 
-		# In a more sure way
 		branchesCol = self.tree.GetListOfBranches()
-		# FIXED: Changed GetSize() -> GetLast() + 1  (Some weird behaviour using the first method)
-		self.collections = dict( [ (branchesCol.At(i).GetName(), pythonize(branchesCol.At(i).GetClassName()) ) for i in xrange(branchesCol.GetLast()+1) ] )
+		# FIXED: Changed GetSize() -> GetLast() + 1 
+		self.collections = dict( [ (branchesCol.At(i).GetName(),\
+				pythonize(branchesCol.At(i).GetClassName()) ) \
+				for i in xrange(branchesCol.GetLast()+1) ] )
 		# Are there aliases?
 		alias = self.tree.GetListOfAliases()
 		if alias:   # It will be a null pointer if no alias
-			self.alias = dict( [ (alias.At(i).GetName(), alias.At(i).GetTitle().rstrip('obj') ) for i in xrange(alias.GetSize()) ] )
+			self.alias = dict( [ (alias.At(i).GetName(), alias.At(i).GetTitle().rstrip('obj') )\
+					for i in xrange(alias.GetSize()) ] )
 		else:
 			self.alias = None
 		
@@ -237,6 +241,9 @@ class pytree(object):
 
 		if len(self.__mispelledbranches__) == 0:
 			self.__mispelledbranches__ = None
+		
+		# The active collections what are going to be in use (when call getproduct method)
+		self.__activeproducts__ = []
 
 	def __str__(self):
 		"""
@@ -289,6 +296,10 @@ class pytree(object):
 		if not self.isInit:
 			self.isInit = True
 
+		# Update the active collections of the tree
+		for col in self.__activeproducts__:
+			col.__update__()
+
 	def getproduct( self, label ):
 		""".. method:: getproduct( label ) -> object
 		"""
@@ -313,10 +324,15 @@ class pytree(object):
 		# FIXME: Deberia registrar los productos que devuelve para actualizarlos
 		#        cada vez que hay un getentry..a: syncronize o algo asi.
 		#        Quien es el encargado de esto, los productos o el tree??
+		theproduct = None
 		if _type_ in PLAIN_TYPES:
-			return pyleaf( self, thelabel, _type_ )
+			theproduct = pyleaf( self, thelabel, _type_ )
 		elif _type_.find( 'Wrapper' ):
-			return pywrapper( self, thelabel, _type_ )
+			theproduct = pywrapper( self, thelabel, _type_ )
+		# Registring the product
+		self.__activeproducts__.append( theproduct )
+
+		return theproduct
 
 	def draw( self, todraw, **keywords ): 
 		""".. method:: draw( todraw[, cut=cutstring, option=optstring ] ) -> canvas
@@ -381,6 +397,23 @@ class pytree(object):
 		return output, gDirectory.Get(outname)
 
 
+#class pycollection(object):
+#	""".. class:: pycollection
+#
+#	Abstract class to deal with the contents of a TTree, i.e. up-to-now branches
+#	with plain leaves and comples (edm::wrappers, std::vector,...) objects. 
+#	This class can not be used directly, see pyleaf and pywrapper classes
+#	"""
+#	def __init__( self, _pytree_, label, _type_ ):
+#		"""
+#		"""
+#		self.label = label
+#		self.__pytree__ = _pytree_
+#		self.treename = self.__pytree__.tree.GetName()
+#		self.nentriestree = self.__pytree__.nentries
+
+
+
 class pyleaf( object ):
 	"""
 	"""
@@ -422,6 +455,14 @@ class pyleaf( object ):
 			raise StopIteration
 
 		return self.leaf.GetValue(index)
+
+	def __update__(self):
+		""".. method:: __update__()
+		Dummy method --> TO Be deprecated when pyleaf and pywrapper inherit from the same
+		class
+		"""
+		pass
+
 
 class pywrapper( object ):
 	"""
@@ -476,7 +517,7 @@ class pywrapper( object ):
 	def __len__(self):
 		"""
 		"""
-		self.__update__()
+		#self.__update__()
 
 		size = self.size
 		if size:
@@ -492,14 +533,14 @@ class pywrapper( object ):
 	def __repr__( self ):
 		"""
 		"""
-		self.__update__()
+		#self.__update__()
 
 		return self.product.__repr__()
 
 	def __getitem__( self, index ):
 		"""
 		"""
-		self.__update__()
+		#self.__update__()
 
 		if not self.size:
 			raise StopIteration
