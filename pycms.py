@@ -397,33 +397,46 @@ class pytree(object):
 		return output, gDirectory.Get(outname)
 
 
-#class pycollection(object):
-#	""".. class:: pycollection
-#
-#	Abstract class to deal with the contents of a TTree, i.e. up-to-now branches
-#	with plain leaves and comples (edm::wrappers, std::vector,...) objects. 
-#	This class can not be used directly, see pyleaf and pywrapper classes
-#	"""
-#	def __init__( self, _pytree_, label, _type_ ):
-#		"""
-#		"""
-#		self.label = label
-#		self.__pytree__ = _pytree_
-#		self.treename = self.__pytree__.tree.GetName()
-#		self.nentriestree = self.__pytree__.nentries
+class pycollection(object):
+	""".. class:: pycollection
 
-
-
-class pyleaf( object ):
-	"""
+	Abstract class to deal with the contents of a TTree, i.e. up-to-now branches
+	with plain leaves and comples (edm::wrappers, std::vector,...) objects. 
+	This class can not be used directly, see pyleaf and pywrapper classes
 	"""
 	def __init__( self, _pytree_, label, _type_ ):
 		"""
 		"""
 		self.label = label
-		self.__pytree__ = _pytree_  # Do not use it. FIXME: HAcer funcion que evite el acceso al pytree
+		self.__pytree__ = _pytree_
 		self.treename = self.__pytree__.tree.GetName()
 		self.nentriestree = self.__pytree__.nentries
+		
+	def size(self):
+		""".. method:: size() -> int
+
+		Get the size of the collection
+		"""
+		return self.__len__()
+
+	def __update__(self):
+		""".. method:: __update__ 
+
+		Dummy method (pyleaf) and need to be implemented for pywrapper
+		"""
+		pass
+
+
+
+class pyleaf( pycollection ):
+	"""
+	"""
+	def __init__( self, _pytree_, label, _type_ ):
+		"""
+		"""
+		# Initialize base class
+		pycollection.__init__(self,_pytree_,label,_type_)
+
 		self.leaf = self.__pytree__.tree.GetLeaf(label)
 		if not self.leaf:
 			message = "'%s' is not an instance of the '%s' TTree" % (label,self.treename)
@@ -439,10 +452,6 @@ class pyleaf( object ):
 		
 		return self.leaf.GetLen()
 
-	def size(self):
-		"""
-		"""
-		return self.__len__()
 
 	def __getitem__( self, index ):
 		"""
@@ -456,15 +465,8 @@ class pyleaf( object ):
 
 		return self.leaf.GetValue(index)
 
-	def __update__(self):
-		""".. method:: __update__()
-		Dummy method --> TO Be deprecated when pyleaf and pywrapper inherit from the same
-		class
-		"""
-		pass
 
-
-class pywrapper( object ):
+class pywrapper( pycollection ):
 	"""
 	"""
 	def __init__( self, _pytree_, label, _type_ ):
@@ -472,15 +474,12 @@ class pywrapper( object ):
 		"""
 		# I need the module in the eval
 		import ROOT
-		#--- FIXME: Provisional patch to deal with double and int stuff
+		#--- Patch to deal with double and int stuff
 		ROOT.double = ROOT.Double
 		ROOT.int    = int
-		#--- END Provisional
 
-		self.label = label
-		self.__pytree__ = _pytree_  # Do not use it. FIXME: HAcer funcion que evite el acceso al pytree
-		self.treename = self.__pytree__.tree.GetName()
-		self.nentriestree = self.__pytree__.nentries
+		# Initialize base class
+		pycollection.__init__(self,_pytree_,label,_type_)
 		self.wrapper = eval( _type_ )
 		self.__pytree__.tree.SetBranchAddress( label, self.wrapper )
 		#if not self.leaf:
@@ -490,7 +489,9 @@ class pywrapper( object ):
 		self.product = None
 
 	def __update__( self ):
-		"""
+		""".. method:: __update__()
+
+		Update the product once a new entry is accessed 
 		"""
 		if not self.__pytree__.isInit:
 			message = "The TTree '%s' is not initialized." % (self.treename)
@@ -517,7 +518,6 @@ class pywrapper( object ):
 	def __len__(self):
 		"""
 		"""
-		#self.__update__()
 
 		size = self.size
 		if size:
@@ -525,23 +525,16 @@ class pywrapper( object ):
 
 		return 0
 
-	def size(self):
-		"""
-		"""
-		return self.__len__()
 
 	def __repr__( self ):
 		"""
 		"""
-		#self.__update__()
-
 		return self.product.__repr__()
+
 
 	def __getitem__( self, index ):
 		"""
 		"""
-		#self.__update__()
-
 		if not self.size:
 			raise StopIteration
 
