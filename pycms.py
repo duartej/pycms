@@ -474,8 +474,9 @@ class pywrapper( pycollection ):
 		"""
 		# I need the module in the eval
 		import ROOT
-		#--- Patch to deal with double and int stuff
+		#--- Patch to deal with double, float and int stuff
 		ROOT.double = ROOT.Double
+		ROOT.float  = float
 		ROOT.int    = int
 
 		# Initialize base class
