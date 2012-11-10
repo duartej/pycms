@@ -304,11 +304,7 @@ class pytree(object):
 			message = "entry '%i' out of range" % (self.nentries)
 			printError( self.__module__+'.pytree.getentry', message, IndexError )
 		else:
-			# Chain or TTree
-			if self.isTChain: 
-				self.tree.GetTree().GetEntry( entry )
-			else:
-				self.tree.GetEntry( entry )
+			self.tree.GetEntry( entry )
 			self.currentry=entry
 
 		if not self.isInit:
@@ -454,8 +450,9 @@ class pyleaf( pycollection ):
 		"""
 		# Initialize base class
 		pycollection.__init__(self,_pytree_,label,_type_)
-
-		self.leaf = self.__pytree__.tree.GetLeaf(label)
+		
+		self.label = label		
+		self.leaf = self.__pytree__.tree.GetLeaf(self.label)
 		if not self.leaf:
 			message = "'%s' is not an instance of the '%s' TTree" % (label,self.treename)
 			printError( self.__module__+'.pyleaf', message, AttributeError )
@@ -467,7 +464,7 @@ class pyleaf( pycollection ):
 		if not self.__pytree__.isInit:
 			message = "The TTree '%s' is not initialized." % (self.treename)
 			printError( self.__module__+'.__getitem__', message, RuntimeError )
-		
+
 		return self.leaf.GetLen()
 
 
@@ -480,8 +477,16 @@ class pyleaf( pycollection ):
 
 		if index >= self.__len__():
 			raise StopIteration
-
+		
 		return self.leaf.GetValue(index)
+
+	def __update__(self):
+		"""
+		Just used if the self.__pytree__.isTChain = True
+		"""
+
+		if self.__pytree__.isTChain:
+			self.leaf = self.__pytree__.tree.GetTree().GetLeaf(self.label)
 
 
 class pywrapper( pycollection ):
