@@ -63,12 +63,12 @@ class pycms( object ):
 	def __init__( self, namerootfile, **keywords ):
 		"""
 		"""
-		from ROOT import TFile
+		from ROOT import TFile,TChain
 		
 		self.totalTrees = 0
 		self.treenames = []
 
-		validkeywords = [ 'trees', 'edm', 'verbose' ]
+		validkeywords = [ 'trees', 'edm', 'verbose' ,'tchain' ]
 		userTrees = False
 		
 		# Check if is EDM and initialize workspace 
@@ -80,6 +80,19 @@ class pycms( object ):
 		if keywords.has_key('verbose') and keywords['verbose']:
 			verbose=True
 
+		# TChain initialization
+		if keywords.has_key('tchain'):
+			self.__rootfile__ = None
+			treeName = keywords['tchain']
+			tchain = TChain(treeName)
+			for f in namerootfile:
+				dummadd = tchain.Add(f)
+			# Checks y demas...
+			self.__setattr__( treeName, pytree(tchain) )
+			self.totalTrees += 1
+			self.treenames.append( treeName )
+			return 
+	
 		
 		# Initialize file (before decide the trees to be used)				
 		if verbose:
