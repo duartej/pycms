@@ -209,6 +209,7 @@ class pytree(object):
 		:type treeobject: ROOT.TTree
 		"""
 		self.tree = treeobject
+		self.isTChain = (self.tree.ClassName() == 'TChain')
 		self.nentries = self.tree.GetEntries()
 		self.currentry = -1
 		self.isInit = False
@@ -303,7 +304,11 @@ class pytree(object):
 			message = "entry '%i' out of range" % (self.nentries)
 			printError( self.__module__+'.pytree.getentry', message, IndexError )
 		else:
-			self.tree.GetEntry( entry )
+			# Chain or TTree
+			if self.isTChain: 
+				self.tree.GetTree().GetEntry( entry )
+			else:
+				self.tree.GetEntry( entry )
 			self.currentry=entry
 
 		if not self.isInit:
@@ -491,6 +496,7 @@ class pywrapper( pycollection ):
 		ROOT.double = ROOT.Double
 		ROOT.float  = float
 		ROOT.int    = int
+		ROOT.bool   = bool
 
 		# Initialize base class
 		pycollection.__init__(self,_pytree_,label,_type_)
