@@ -317,7 +317,7 @@ class pytree(object):
 	def getproduct( self, label ):
 		""".. method:: getproduct( label ) -> object
 		"""
-		PLAIN_TYPES = [ 'Bool_t', 'Int_t', 'Float_t' ]
+		PLAIN_TYPES = [ 'Bool_t', 'Int_t', 'Float_t', 'UInt_t' ]
 
 		thelabel = label
 
@@ -341,7 +341,7 @@ class pytree(object):
 		theproduct = None
 		if _type_ in PLAIN_TYPES:
 			theproduct = pyleaf( self, thelabel, _type_ )
-		elif _type_.find( 'Wrapper' ):
+		elif _type_.find( 'Wrapper' ) != -1:
 			theproduct = pywrapper( self, thelabel, _type_ )
 		# Registring the product
 		self.__activeproducts__.append( theproduct )
